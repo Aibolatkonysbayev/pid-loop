@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced People - Interactive PID Control Loop Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh; /* Ensure body takes full height */
+        }
+        .main-content {
+            flex-grow: 1; /* Allow main content to grow */
+        }
+        /* Custom styles for sliders */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #d1d5db; /* Gray track */
+            border-radius: 5px;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+        }
+        input[type="range"]:hover {
+            opacity: 1;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #3b82f6; /* Blue thumb */
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #3b82f6; /* Blue thumb */
+            border-radius: 50%;
+            cursor: pointer;
+            border: none; /* Remove default border */
+        }
+        /* Style for disabled state */
+        input:disabled, button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        /* Ensure canvas is responsive but has a max height */
+        #responseChart {
+            max-height: 400px; /* Adjust as needed */
+            width: 100%;
+        }
+        .value-box {
+            min-width: 60px; /* Ensure boxes have some minimum width */
+            text-align: center;
+        }
+        footer {
+            background-color: #e5e7eb; /* Slightly darker gray for footer */
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="main-content max-w-6xl mx-auto bg-white p-6 rounded-lg shadow-lg mb-8">
+        <div class="flex flex-col sm:flex-row items-center justify-between mb-6 border-b pb-4 border-gray-200">
+            <h1 class="text-xl md:text-2xl font-bold text-center sm:text-left text-gray-800 mb-2 sm:mb-0">
+                Advanced People <br class="sm:hidden"> PID Control Loop Simulator
+            </h1>
+            <img src="https://placehold.co/150x50/003366/FFFFFF?text=Advanced+People"
+                 alt="Advanced People Logo"
+                 class="h-10 md:h-12 object-contain rounded"
+                 onerror="this.onerror=null; this.src='https://placehold.co/150x50/CCCCCC/000000?text=Logo+Error';">
+                 </div>
+
+
+        <div class="flex flex-col md:flex-row gap-6">
+
+            <div class="w-full md:w-1/3 space-y-5">
+
+                <div class="bg-gray-100 p-4 rounded-lg shadow-sm">
+                    <h2 class="text-lg font-semibold mb-3 text-gray-700">Simulation Control</h2>
+                    <div class="flex gap-2">
+                        <button id="startButton" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition duration-150 ease-in-out">Start</button>
+                        <button id="stopButton" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition duration-150 ease-in-out" disabled>Stop</button>
+                        <button id="resetButton" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-150 ease-in-out">Reset</button>
+                    </div>
+                     <p id="statusMessage" class="text-sm text-gray-600 mt-2">Status: Idle</p>
+                </div>
+
+                <div class="bg-gray-100 p-4 rounded-lg shadow-sm">
+                    <h2 class="text-lg font-semibold mb-3 text-gray-700">PID Parameters</h2>
+                    <div class="space-y-3">
+                        <div>
+                            <label for="kpSlider" class="block text-sm font-medium text-gray-700">Proportional Gain (Kp): <span id="kpValue" class="font-semibold">1.0</span></label>
+                            <input type="range" id="kpSlider" min="0" max="10" step="0.1" value="1.0" class="mt-1">
+                        </div>
+                        <div>
+                            <label for="kiSlider" class="block text-sm font-medium text-gray-700">Integral Gain (Ki): <span id="kiValue" class="font-semibold">0.1</span></label>
+                            <input type="range" id="kiSlider" min="0" max="2" step="0.01" value="0.1" class="mt-1">
+                        </div>
+                        <div>
+                            <label for="kdSlider" class="block text-sm font-medium text-gray-700">Derivative Gain (Kd): <span id="kdValue" class="font-semibold">0.01</span></label>
+                            <input type="range" id="kdSlider" min="0" max="1" step="0.01" value="0.01" class="mt-1">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-100 p-4 rounded-lg shadow-sm">
+                    <h2 class="text-lg font-semibold mb-3 text-gray-700">Setpoint & Disturbances</h2>
+                     <div class="mb-3">
+                        <label for="spInput" class="block text-sm font-medium text-gray-700">Setpoint (SP): <span id="spValue" class="font-semibold">50</span></label>
+                        <input type="range" id="spInput" min="0" max="100" step="1" value="50" class="mt-1">
+                    </div>
+                    <div>
+                         <label class="block text-sm font-medium text-gray-700 mb-2">Introduce Disturbance:</label>
+                        <button id="loadDisturbanceButton" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded transition duration-150 ease-in-out">Apply Load Disturbance (+20)</button>
+                    </div>
+                </div>
+
+                <div class="bg-gray-100 p-4 rounded-lg shadow-sm">
+                    <h2 class="text-lg font-semibold mb-3 text-gray-700">Process Model (FOPDT)</h2>
+                    <div class="space-y-3">
+                        <div>
+                            <label for="processGainSlider" class="block text-sm font-medium text-gray-700">Process Gain: <span id="processGainValue" class="font-semibold">1.0</span></label>
+                            <input type="range" id="processGainSlider" min="0.1" max="5" step="0.1" value="1.0" class="mt-1">
+                        </div>
+                        <div>
+                            <label for="timeConstantSlider" class="block text-sm font-medium text-gray-700">Time Constant (s): <span id="timeConstantValue" class="font-semibold">5.0</span></label>
+                            <input type="range" id="timeConstantSlider" min="0.5" max="20" step="0.1" value="5.0" class="mt-1">
+                        </div>
+                        <div>
+                            <label for="deadTimeSlider" class="block text-sm font-medium text-gray-700">Dead Time (s): <span id="deadTimeValue" class="font-semibold">1.0</span></label>
+                            <input type="range" id="deadTimeSlider" min="0" max="10" step="0.1" value="1.0" class="mt-1">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="w-full md:w-2/3">
+                <div class="grid grid-cols-3 gap-4 mb-4">
+                    <div class="bg-blue-100 p-3 rounded-lg shadow-sm text-center">
+                        <div class="text-sm font-medium text-blue-800">Setpoint (SP)</div>
+                        <div id="currentSP" class="text-xl font-bold text-blue-900">50.0</div>
+                    </div>
+                    <div class="bg-green-100 p-3 rounded-lg shadow-sm text-center">
+                        <div class="text-sm font-medium text-green-800">Process Var (PV)</div>
+                        <div id="currentPV" class="text-xl font-bold text-green-900">0.0</div>
+                    </div>
+                    <div class="bg-purple-100 p-3 rounded-lg shadow-sm text-center">
+                        <div class="text-sm font-medium text-purple-800">Output (OP %)</div>
+                        <div id="currentOP" class="text-xl font-bold text-purple-900">0.0</div>
+                    </div>
+                     <div class="bg-red-100 p-3 rounded-lg shadow-sm text-center col-span-3">
+                        <div class="text-sm font-medium text-red-800">Error (SP - PV)</div>
+                        <div id="currentError" class="text-xl font-bold text-red-900">0.0</div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-4 rounded-lg shadow-inner border border-gray-200">
+                     <h2 class="text-lg font-semibold mb-3 text-gray-700 text-center">Loop Response</h2>
+                    <canvas id="responseChart"></canvas>
+                </div>
+            </div>
+
+        </div> </div> <footer class="w-full mt-auto p-4 text-center text-sm text-gray-600">
+        &copy; <span id="currentYear"></span> Advanced People. All rights reserved. Proprietary Tool.
+    </footer>
+
+
+    <script>
+        // --- DOM Elements ---
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const resetButton = document.getElementById('resetButton');
+        const loadDisturbanceButton = document.getElementById('loadDisturbanceButton');
+
+        const kpSlider = document.getElementById('kpSlider');
+        const kiSlider = document.getElementById('kiSlider');
+        const kdSlider = document.getElementById('kdSlider');
+        const spInput = document.getElementById('spInput'); // Changed to range slider
+        const processGainSlider = document.getElementById('processGainSlider');
+        const timeConstantSlider = document.getElementById('timeConstantSlider');
+        const deadTimeSlider = document.getElementById('deadTimeSlider');
+
+        const kpValueSpan = document.getElementById('kpValue');
+        const kiValueSpan = document.getElementById('kiValue');
+        const kdValueSpan = document.getElementById('kdValue');
+        const spValueSpan = document.getElementById('spValue'); // Span to display SP value
+        const processGainValueSpan = document.getElementById('processGainValue');
+        const timeConstantValueSpan = document.getElementById('timeConstantValue');
+        const deadTimeValueSpan = document.getElementById('deadTimeValue');
+
+        const currentSPSpan = document.getElementById('currentSP');
+        const currentPVSpan = document.getElementById('currentPV');
+        const currentOPSpan = document.getElementById('currentOP');
+        const currentErrorSpan = document.getElementById('currentError');
+        const statusMessage = document.getElementById('statusMessage');
+        const currentYearSpan = document.getElementById('currentYear'); // For footer year
+
+        const chartCanvas = document.getElementById('responseChart');
+
+        // --- Simulation Parameters ---
+        let Kp = parseFloat(kpSlider.value);
+        let Ki = parseFloat(kiSlider.value);
+        let Kd = parseFloat(kdSlider.value);
+        let setpoint = parseFloat(spInput.value);
+        let processGain = parseFloat(processGainSlider.value);
+        let timeConstant = parseFloat(timeConstantSlider.value); // Time constant in seconds
+        let deadTime = parseFloat(deadTimeSlider.value);       // Dead time in seconds
+
+        // --- Simulation State ---
+        let simulationInterval = null;
+        let time = 0; // Simulation time in seconds
+        const dt = 0.1; // Time step in seconds (100ms) - smaller dt = more accurate but more computation
+        let pv = 0; // Process Variable
+        let op = 0; // Controller Output (0-100%)
+        let error = 0;
+        let integral = 0;
+        let previousError = 0;
+        let loadDisturbance = 0; // Load disturbance value
+        let opBuffer = []; // Buffer for controller output to simulate dead time
+        let deadTimeSteps = 0; // Number of steps for dead time
+
+        // --- Chart Configuration ---
+        let chart;
+        const maxDataPoints = 200; // Limit data points for performance
+        let chartData = {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Setpoint (SP)',
+                    borderColor: 'rgb(59, 130, 246)', // Blue
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    data: [],
+                    tension: 0.1,
+                    pointRadius: 0, // Hide points for cleaner line
+                    borderWidth: 2
+                },
+                {
+                    label: 'Process Variable (PV)',
+                    borderColor: 'rgb(34, 197, 94)', // Green
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    data: [],
+                    tension: 0.1,
+                    pointRadius: 0,
+                    borderWidth: 2
+                },
+                {
+                    label: 'Output (OP %)',
+                    borderColor: 'rgb(168, 85, 247)', // Purple
+                    backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                    data: [],
+                    tension: 0.1,
+                    pointRadius: 0,
+                    borderWidth: 2,
+                    // yAxisID: 'yOp' // Assign to secondary axis if needed (optional) - Removed for simplicity
+                }
+            ]
+        };
+
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false, // Allow chart to fill container height
+            animation: false, // Disable animation for real-time updates
+            scales: {
+                x: {
+                    type: 'linear',
+                    title: {
+                        display: true,
+                        text: 'Time (s)'
+                    },
+                     ticks: {
+                        // Prevent overlapping labels on smaller screens
+                        maxRotation: 0,
+                        minRotation: 0,
+                        autoSkip: true,
+                        maxTicksLimit: 10 // Limit number of ticks shown
+                    }
+                },
+                y: { // Primary Y-axis for SP, PV, and OP
+                    type: 'linear',
+                    position: 'left',
+                    min: 0,
+                    max: 110, // Slightly more than 0-100 range
+                    title: {
+                        display: true,
+                        text: 'Value / Output (%)' // Combined axis title
+                    }
+                },
+                 // Removed optional secondary axis 'yOp' for simplicity as OP% fits well on primary
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                tooltip: {
+                    enabled: false // Disable tooltips for performance in real-time
+                }
+            }
+        };
+
+        // --- Functions ---
+
+        // Initialize the chart
+        function initializeChart() {
+            if (chart) {
+                chart.destroy(); // Destroy previous chart instance if exists
+            }
+            const ctx = chartCanvas.getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: chartData,
+                options: chartOptions
+            });
+        }
+
+        // Update display values
+        function updateDisplays() {
+            currentSPSpan.textContent = setpoint.toFixed(1);
+            currentPVSpan.textContent = pv.toFixed(1);
+            currentOPSpan.textContent = op.toFixed(1);
+            currentErrorSpan.textContent = error.toFixed(1);
+
+            // Update slider value displays
+            kpValueSpan.textContent = Kp.toFixed(2);
+            kiValueSpan.textContent = Ki.toFixed(2);
+            kdValueSpan.textContent = Kd.toFixed(2);
+            spValueSpan.textContent = setpoint.toFixed(0); // SP is integer steps
+            processGainValueSpan.textContent = processGain.toFixed(1);
+            timeConstantValueSpan.textContent = timeConstant.toFixed(1);
+            deadTimeValueSpan.textContent = deadTime.toFixed(1);
+        }
+
+        // Update the chart with new data
+        function updateChart() {
+            chartData.labels.push(time.toFixed(1));
+            chartData.datasets[0].data.push(setpoint);
+            chartData.datasets[1].data.push(pv);
+            chartData.datasets[2].data.push(op);
+
+            // Limit data points shown
+            if (chartData.labels.length > maxDataPoints) {
+                chartData.labels.shift();
+                chartData.datasets.forEach(dataset => dataset.data.shift());
+            }
+
+            chart.update(); // Update the chart
+        }
+
+        // Reset the simulation state and chart
+        function resetSimulation() {
+            stopSimulation(); // Ensure simulation is stopped
+
+            time = 0;
+            pv = 0;
+            op = 0;
+            error = 0;
+            integral = 0;
+            previousError = 0;
+            loadDisturbance = 0;
+            opBuffer = []; // Clear the dead time buffer
+            deadTimeSteps = Math.round(deadTime / dt); // Recalculate based on current deadTime setting
+            // Pre-fill buffer with initial OP (0) for the dead time duration
+            for (let i = 0; i < deadTimeSteps; i++) {
+                opBuffer.push(0);
+            }
+
+
+            // Reset chart data
+            chartData.labels = [];
+            chartData.datasets.forEach(dataset => dataset.data = []);
+
+            initializeChart(); // Re-initialize chart to clear it
+            updateDisplays();
+            statusMessage.textContent = "Status: Reset";
+        }
+
+        // Stop the simulation loop
+        function stopSimulation() {
+            if (simulationInterval) {
+                clearInterval(simulationInterval);
+                simulationInterval = null;
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                statusMessage.textContent = "Status: Stopped";
+            }
+        }
+
+        // Start the simulation loop
+        function startSimulation() {
+            if (simulationInterval) return; // Already running
+
+            // Ensure buffer is initialized correctly before starting
+            deadTimeSteps = Math.round(deadTime / dt);
+            if (opBuffer.length !== deadTimeSteps) { // If dead time changed since last reset/start
+                 opBuffer = Array(deadTimeSteps).fill(op); // Fill with current OP or 0 if just reset
+            }
+
+
+            startButton.disabled = true;
+            stopButton.disabled = false;
+            statusMessage.textContent = "Status: Running";
+
+            simulationInterval = setInterval(simulationStep, dt * 1000); // Run step every dt seconds
+        }
+
+        // Perform one step of the simulation
+        function simulationStep() {
+            // 1. Read current parameters (allows real-time tuning)
+            Kp = parseFloat(kpSlider.value);
+            Ki = parseFloat(kiSlider.value);
+            Kd = parseFloat(kdSlider.value);
+            setpoint = parseFloat(spInput.value);
+            processGain = parseFloat(processGainSlider.value);
+            timeConstant = parseFloat(timeConstantSlider.value);
+            // Update dead time steps if slider changed
+            const newDeadTime = parseFloat(deadTimeSlider.value);
+            if (newDeadTime !== deadTime) {
+                 deadTime = newDeadTime;
+                 deadTimeSteps = Math.round(deadTime / dt);
+                 // Adjust buffer size - simple approach: reset buffer if size changes drastically
+                 opBuffer = Array(deadTimeSteps).fill(op); // Refill with current OP
+            }
+
+
+            // 2. Calculate Error
+            error = setpoint - pv;
+
+            // 3. Calculate PID Output
+            // Proportional Term
+            const pTerm = Kp * error;
+
+            // Integral Term (with anti-windup)
+            integral += Ki * error * dt;
+            // Anti-windup is implicitly handled by clamping OP below
+
+            // Derivative Term
+            const derivative = (error - previousError) / dt;
+            const dTerm = Kd * derivative;
+
+            // Calculate raw OP
+            let rawOp = pTerm + integral + dTerm;
+
+            // Clamp OP to 0-100 range
+            op = Math.max(0, Math.min(100, rawOp));
+
+            // Simple Anti-windup: If OP hit limits, prevent integral from growing further in that direction
+            if ((op >= 100 && Ki * error * dt > 0) || (op <= 0 && Ki * error * dt < 0)) {
+                // If output is saturated and integral term is pushing it further into saturation,
+                // effectively pause integration for this step by subtracting the contribution.
+                 integral -= Ki * error * dt;
+            }
+
+
+            // Store current error for next derivative calculation
+            previousError = error;
+
+            // --- Process Simulation (FOPDT Model) ---
+            // Add current OP to the buffer
+            opBuffer.push(op);
+            // Get the delayed OP from the buffer (if buffer is full)
+            let delayedOp = (opBuffer.length > deadTimeSteps) ? opBuffer.shift() : 0; // Use 0 if buffer not filled yet
+
+            // Calculate the change in PV using Euler method for First Order part
+            // d(PV)/dt = (processGain * delayedOp + loadDisturbance - PV) / timeConstant
+            const dPV = (processGain * delayedOp + loadDisturbance - pv) / timeConstant * dt;
+            pv += dPV;
+
+            // Clamp PV to reasonable bounds if necessary (e.g., 0-150)
+            pv = Math.max(0, Math.min(150, pv));
+
+            // Decay load disturbance over time (optional, makes it temporary)
+            // loadDisturbance *= 0.95; // Example decay
+            // Or reset it after one application if desired (handled in button click)
+
+            // 4. Update Time
+            time += dt;
+
+            // 5. Update Displays and Chart
+            updateDisplays();
+            updateChart();
+        }
+
+
+        // --- Event Listeners ---
+        startButton.addEventListener('click', startSimulation);
+        stopButton.addEventListener('click', stopSimulation);
+        resetButton.addEventListener('click', resetSimulation);
+
+        loadDisturbanceButton.addEventListener('click', () => {
+            loadDisturbance += 20; // Apply a step disturbance
+            statusMessage.textContent = "Status: Load Disturbance Applied (+20)";
+            // Make disturbance temporary - remove after 5 seconds
+             setTimeout(() => {
+                 loadDisturbance = Math.max(0, loadDisturbance - 20); // Remove the added disturbance
+                 // Update status only if simulation is running, otherwise it stays 'Applied' until reset/start
+                 if (simulationInterval) {
+                    statusMessage.textContent = "Status: Running";
+                 }
+             }, 5000);
+            if (!simulationInterval) { // Start simulation if idle when disturbance applied
+                 startSimulation();
+            }
+        });
+
+        // Update parameter values when sliders change
+        kpSlider.addEventListener('input', () => { Kp = parseFloat(kpSlider.value); updateDisplays(); });
+        kiSlider.addEventListener('input', () => { Ki = parseFloat(kiSlider.value); updateDisplays(); });
+        kdSlider.addEventListener('input', () => { Kd = parseFloat(kdSlider.value); updateDisplays(); });
+        spInput.addEventListener('input', () => { setpoint = parseFloat(spInput.value); updateDisplays(); }); // Update SP immediately
+        processGainSlider.addEventListener('input', () => { processGain = parseFloat(processGainSlider.value); updateDisplays(); });
+        timeConstantSlider.addEventListener('input', () => { timeConstant = parseFloat(timeConstantSlider.value); updateDisplays(); });
+        deadTimeSlider.addEventListener('input', () => {
+            // Update deadTime immediately for display, simulationStep will handle buffer adjustment
+            deadTime = parseFloat(deadTimeSlider.value);
+            updateDisplays();
+        });
+
+
+        // --- Initial Setup ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set current year in footer
+            currentYearSpan.textContent = new Date().getFullYear();
+            resetSimulation(); // Initialize chart and state on load
+        });
+
+    </script>
+
+</body>
+</html>
